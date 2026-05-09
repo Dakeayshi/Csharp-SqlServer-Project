@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Entity;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -10,10 +11,29 @@ using System.Threading.Tasks;
 
 namespace ConsoleConnectSqlServer
 {
+
     internal class Program
     {
         static void Main(string[] args)
-        {   
+        {
+
+            using (MyDBContext myDB = new MyDBContext())
+            {
+                DbSet<UserTModelForEF> listQuery = myDB.UserT;
+
+                List<UserTModelForEF> list = listQuery.ToList();
+
+                var query = from usert in myDB.UserT
+                            select new UserTModelForEFNew
+                            {
+                                UserName = usert.UserName,
+                                NickName = usert.NickName,
+                                Password = usert.Password
+                            };
+
+
+                List<UserTModelForEFNew> lst = query.ToList();
+            }
 
             //Set system language
             InfoHelper.ChangeLanguage();
@@ -22,7 +42,8 @@ namespace ConsoleConnectSqlServer
             Console.WriteLine(InfoHelper.Info1);
             Console.WriteLine(InfoHelper.Info2);
 
-            UserTModel userTM = new UserTModel();
+            //UserTModel userTM = new UserTModel();
+            UserTModelForEF userTM = new UserTModelForEF();
 
             while (true)
             {
@@ -33,14 +54,19 @@ namespace ConsoleConnectSqlServer
                 Console.Write(InfoHelper.Info4);
                 string inputPwd = Console.ReadLine();
 
-                userTM = UserTOperation.Login(inputName, inputPwd);
-
-                //Verify user's input
-                if (userTM == null)
+                //userTM = UserTOperation.Login(inputName, inputPwd);
+                using (MyDBContext myDB = new MyDBContext())
                 {
-                    Console.WriteLine(InfoHelper.Info5);
-                    continue;
+                    userTM = myDB.UserT.FirstOrDefault(e => e.UserName == inputName && e.Password == inputPwd);
                 }
+
+
+                    //Verify user's input
+                    if (userTM == null)
+                    {
+                        Console.WriteLine(InfoHelper.Info5);
+                        continue;
+                    }
                 break;
             }
 
@@ -60,35 +86,94 @@ namespace ConsoleConnectSqlServer
                     if (inputGender != "1" && inputGender != "2")
                         continue;
 
-                    //Update data to database
-                    string updateGenderSql = $"UPDATE UserT SET Gender='{inputGender}' WHERE UserName = userTM.UserName;";
-                    int i = SqlHelper.EditData(updateGenderSql);
-                    if (i < 0)
+                    using (MyDBContext myDB = new MyDBContext())
                     {
-                        InfoHelper.Info9 = InfoHelper.Info9.Replace("@Username", userTM.UserName);
-                        Console.WriteLine(InfoHelper.Info9);                    
+                        myDB.UserT.Attach(userTM);
+                        myDB.Entry(userTM).State = System.Data.Entity.EntityState.Modified;
+
+                        userTM.Gender = inputGender;
+
+                        myDB.SaveChanges();
                     }
-                    else
-                    {
-                        InfoHelper.Info10 = InfoHelper.Info10.Replace("@Username", userTM.UserName);
-                        Console.WriteLine(InfoHelper.Info10);                    
-                    }
-                    break;
+
+                        ////Update data to database
+                        //string updateGenderSql = $"UPDATE UserT SET Gender='{inputGender}' WHERE UserName = userTM.UserName;";
+                        //int i = SqlHelper.EditData(updateGenderSql);
+                        //if (i < 0)
+                        //{
+                        //    InfoHelper.Info9 = InfoHelper.Info9.Replace("@Username", userTM.UserName);
+                        //    Console.WriteLine(InfoHelper.Info9);                    
+                        //}
+                        //else
+                        //{
+                        //    InfoHelper.Info10 = InfoHelper.Info10.Replace("@Username", userTM.UserName);
+                        //    Console.WriteLine(InfoHelper.Info10);                    
+                        //}
+                        break;
                 }
 
             }
 
-            List <UserTAndUserScoresTModel> LstData = UserTAndUserScoresTOperation.GetTop1Data();
-            for(int i = 0; i < LstData.Count; i++)
+            using (MyDBContext myDB = new MyDBContext())
             {
-                string genderForSql = LstData[i].Gender;
-                if (LstData[i].Gender == "1")
-                    LstData[i].Gender = InfoHelper.Gender1;
-                else if (LstData[i].Gender == "2")
-                    LstData[i].Gender = InfoHelper.Gender2;
+                List<UserTModelForEF> lstAllUsers = myDB.UserT.ToList();
 
-                Console.WriteLine($"{LstData[i].UserName} {LstData[i].NickName} {LstData[i].Gender} {LstData[i].Chinese} {LstData[i].English} {LstData[i].Math} {LstData[i].RecordTime}");
+                for(int i = 0; i < lstAllUsers.Count; i++)
+                {
+                    string genderForSql = lstAllUsers[i].Gender;
+                    if (lstAllUsers[i].Gender == "1")
+                        lstAllUsers[i].Gender = InfoHelper.Gender1;
+                    else if (lstAllUsers[i].Gender == "2")
+                        lstAllUsers[i].Gender = InfoHelper.Gender2;
+
+                    string currentUserName = lstAllUsers[i].UserName;
+
+                    UserScoresTModelForEF currentScore = myDB.UserScoresT.Where(e => e.UserName == currentUserName).OrderByDescending(e => e.RecordTime).First();
+
+
+
+                    Console.WriteLine($"{lstAllUsers[i].UserName} {lstAllUsers[i].NickName} {lstAllUsers[i].Gender} {currentScore.Chinese} {currentScore.English} {currentScore.Math} {currentScore.RecordTime}");
+
+                    //List<UserScoresTModelForEF> lstAllUserScores = myDB.UserScoresT.Where(e => e.UserName == currentUserName).ToList();
+                    //foreach(UserScoresTModelForEF item in lstAllUserScores)
+                    //{
+                    //    Console.WriteLine($"{lstAllUsers[i].UserName} {lstAllUsers[i].NickName} {lstAllUsers[i].Gender} {item.Chinese} {item.English} {item.Math} {item.RecordTime}");
+                    //}
+                }
             }
+
+            using (MyDBContext myDB = new MyDBContext())
+            {
+                var query = from usert in myDB.UserT
+                            join userscorest in myDB.UserScoresT
+                            on usert.UserName equals userscorest.UserName 
+                            into utus
+                            from userscorest in utus.OrderByDescending(e => e.RecordTime).Take(1).DefaultIfEmpty()
+                            select new UserTAndUserScoresTModelForEF {
+                            UserName = usert.UserName,
+                            NickName = usert.NickName,
+                            Gender = usert.Gender,
+                            Password = usert.Password,
+                            Chinese = userscorest.Chinese,
+                            English = userscorest.English,
+                            Math = userscorest.Math,
+                            RecordTime = userscorest.RecordTime
+                            };
+
+                List<UserTAndUserScoresTModelForEF> lst = query.ToList();
+            }
+
+            //List <UserTAndUserScoresTModel > LstData = UserTAndUserScoresTOperation.GetTop1Data();
+            //for(int i = 0; i < LstData.Count; i++)
+            //{
+            //    string genderForSql = LstData[i].Gender;
+            //    if (LstData[i].Gender == "1")
+            //        LstData[i].Gender = InfoHelper.Gender1;
+            //    else if (LstData[i].Gender == "2")
+            //        LstData[i].Gender = InfoHelper.Gender2;
+
+            //    Console.WriteLine($"{LstData[i].UserName} {LstData[i].NickName} {LstData[i].Gender} {LstData[i].Chinese} {LstData[i].English} {LstData[i].Math} {LstData[i].RecordTime}");
+            //}
 
 
             //List<UserTModel> users = UserTOperation.AllUsers();

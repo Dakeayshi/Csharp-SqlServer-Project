@@ -57,6 +57,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="EF6\MyDBContext.cs" />
+    <Compile Include="EF6\UserScoresTModelForEF.cs" />
+    <Compile Include="EF6\UserTAndUserScoresTModelForEF.cs" />
     <Compile Include="EF6\UserTModelForEF.cs" />
     <Compile Include="InfoHelper.cs" />
     <Compile Include="Program.cs" />

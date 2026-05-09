@@ -27,7 +27,7 @@ namespace ConsoleConnectSqlServer
         public static void ChangeLanguage()
         {
             //Choose display language
-            Console.WriteLine("1. English 2:中文 3: Bahasa Melayu");
+            Console.WriteLine("1: English 2:中文 3: Bahasa Melayu");
             string inputLang = Console.ReadLine();
 
             if (inputLang == "2")
